@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon, RefreshCwIcon, XCircleIcon } from 'lucide-react';
+import { toast } from 'sonner';
+import { AlertTriangleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon, QrCodeIcon, RefreshCwIcon, ScanLineIcon, XCircleIcon } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -18,6 +19,9 @@ import { useRemoteSyncStatus } from '@/core/remote-sync/useRemoteSyncStatus';
 import { composeRemoteUrl, composeRemoteUrlForDisplay, pingRemote } from '@/core/remote-sync/remoteSyncClient';
 import { drainQueue, runInitialBackfill, setRemoteSyncSettings } from '@/core/remote-sync/remoteSyncService';
 import { RemoteSyncWarningDialog } from './RemoteSyncWarningDialog';
+import { RemoteSyncShareQRDialog } from './RemoteSyncShareQRDialog';
+import { RemoteSyncScanQRDialog } from './RemoteSyncScanQRDialog';
+import type { RemoteSyncConfigShare } from '@/core/remote-sync/remoteSyncQRPayload';
 
 interface RemoteSyncSettingsSheetProps {
   open: boolean;
@@ -38,6 +42,8 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
   const [warningOpen, setWarningOpen] = useState(false);
   const [testState, setTestState] = useState<TestState>({ kind: 'idle' });
   const [backfillSummary, setBackfillSummary] = useState<string>('');
+  const [shareQROpen, setShareQROpen] = useState(false);
+  const [scanQROpen, setScanQROpen] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -113,6 +119,12 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
 
   function handleSaveOnly() {
     updateSettings({ remoteSync: draft });
+  }
+
+  function handleScannedConfig(config: RemoteSyncConfigShare) {
+    setDraft(prev => ({ ...prev, ...config }));
+    setTestState({ kind: 'idle' });
+    toast.success('Sync config imported — review and Save.');
   }
 
   return (
@@ -239,6 +251,25 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
                   {testState.kind === 'testing' ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : null}
                   Test connection
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!canTest}
+                  onClick={() => setShareQROpen(true)}
+                  title="Share this config with another scout via QR"
+                >
+                  <QrCodeIcon className="mr-2 size-4" />
+                  Share via QR
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setScanQROpen(true)}
+                  title="Import a config from another scout's QR"
+                >
+                  <ScanLineIcon className="mr-2 size-4" />
+                  Scan to import
+                </Button>
                 {testState.kind === 'success' && (
                   <span className="flex items-center gap-1 text-sm text-emerald-600">
                     <CheckCircle2Icon className="size-4" />
@@ -328,6 +359,18 @@ curl -X PUT $URL/_node/_local/_config/cors/headers -d '"accept, authorization, c
         open={warningOpen}
         onCancel={() => setWarningOpen(false)}
         onContinue={handleWarningContinue}
+      />
+
+      <RemoteSyncShareQRDialog
+        open={shareQROpen}
+        onOpenChange={setShareQROpen}
+        draft={draft}
+      />
+
+      <RemoteSyncScanQRDialog
+        open={scanQROpen}
+        onOpenChange={setScanQROpen}
+        onScanned={handleScannedConfig}
       />
     </>
   );
