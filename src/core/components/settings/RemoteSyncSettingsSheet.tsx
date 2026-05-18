@@ -81,11 +81,18 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
 
   async function handleTestConnection() {
     setTestState({ kind: 'testing' });
-    const result = await pingRemote(composedUrl);
-    if (result.ok) {
-      setTestState({ kind: 'success', dbExists: result.dbExists });
-    } else {
-      setTestState({ kind: 'error', message: result.error || 'Unknown error' });
+    try {
+      const result = await pingRemote(composedUrl);
+      if (result.ok) {
+        setTestState({ kind: 'success', dbExists: result.dbExists });
+      } else {
+        setTestState({ kind: 'error', message: result.error || 'Unknown error' });
+      }
+    } catch (err) {
+      // pingRemote is internally try/catch-wrapped, but guard here too so an
+      // unexpected throw can't leave the button spinning forever.
+      const message = err instanceof Error ? err.message : String(err) || 'Unknown error';
+      setTestState({ kind: 'error', message });
     }
   }
 
@@ -292,10 +299,13 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
                     <p>
                       A terminal <code>curl</code> can hit CouchDB even when the browser cannot, because browsers
                       enforce CORS. CouchDB does not send CORS headers by default — you need to enable them on
-                      the server (one-time setup):
+                      the server (one-time setup). Replace <code>$URL</code> with your CouchDB admin URL and{' '}
+                      <code>$ORIGIN</code> with the exact origin Maneuver is served from (e.g.{' '}
+                      <code>https://maneuver.your-team.org</code>). A wildcard <code>*</code> origin is{' '}
+                      <strong>not valid</strong> with <code>cors/credentials = true</code> — browsers reject that combination.
                     </p>
                     <pre className="overflow-x-auto rounded-md bg-muted p-2 text-[10px] leading-tight">{`curl -X PUT $URL/_node/_local/_config/httpd/enable_cors -d '"true"'
-curl -X PUT $URL/_node/_local/_config/cors/origins -d '"*"'
+curl -X PUT $URL/_node/_local/_config/cors/origins -d '"$ORIGIN"'
 curl -X PUT $URL/_node/_local/_config/cors/credentials -d '"true"'
 curl -X PUT $URL/_node/_local/_config/cors/methods -d '"GET, PUT, POST, HEAD, DELETE"'
 curl -X PUT $URL/_node/_local/_config/cors/headers -d '"accept, authorization, content-type, origin, referer"'`}</pre>
