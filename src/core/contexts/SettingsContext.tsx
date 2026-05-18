@@ -121,11 +121,16 @@ export function SettingsProvider({
   );
 
   // Backfill defaults for keys missing from older persisted settings (e.g. remoteSync added later).
+  // Order of precedence: built-in defaults < provider defaults < persisted settings.
   const settings: AppSettings = {
     ...defaultSettings,
     ...defaults,
     ...rawSettings,
-    remoteSync: { ...defaultRemoteSyncSettings, ...(rawSettings?.remoteSync ?? {}) }
+    remoteSync: {
+      ...defaultRemoteSyncSettings,
+      ...(defaults?.remoteSync ?? {}),
+      ...(rawSettings?.remoteSync ?? {})
+    }
   };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {

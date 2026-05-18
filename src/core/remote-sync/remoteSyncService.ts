@@ -34,6 +34,7 @@ import {
   enqueueFailures,
   getAllPending,
   getQueueSize,
+  markAttempted,
   removeByQueueIds
 } from './remoteSyncQueue';
 
@@ -239,19 +240,35 @@ export async function drainQueue(): Promise<{ drained: number; remaining: number
           result = await pushDocuments(url, docs);
         } catch (err) {
           lastError = err instanceof Error ? err.message : String(err);
+          // Whole batch faulted (network/CORS/etc) — bump attempts and persist
+          // the error on every queue entry in this batch so retry metadata
+          // reflects reality.
+          await markAttempted(batch.map(entry => entry.queueId), lastError);
           continue;
         }
         const succeededIdSet = new Set(result.succeeded);
         const successQueueIds: string[] = [];
+        const failedIdToError = new Map(result.failed.map(failure => [failure.id, failure.error] as const));
+        const failedQueueAttempts: Array<{ queueId: string; error: string }> = [];
         for (let j = 0; j < batch.length; j++) {
           const doc = docs[j];
           const entry = batch[j];
           if (!doc || !entry) continue;
-          if (succeededIdSet.has(doc._id)) successQueueIds.push(entry.queueId);
+          if (succeededIdSet.has(doc._id)) {
+            successQueueIds.push(entry.queueId);
+          } else {
+            const docError = failedIdToError.get(doc._id);
+            if (docError) failedQueueAttempts.push({ queueId: entry.queueId, error: docError });
+          }
         }
         if (successQueueIds.length > 0) {
           await removeByQueueIds(successQueueIds);
           drained += successQueueIds.length;
+        }
+        // Persist retry metadata per failed queue entry so attempts and
+        // lastError reflect this drain attempt, not just the last successful push.
+        for (const failure of failedQueueAttempts) {
+          await markAttempted([failure.queueId], failure.error);
         }
         if (result.failed.length > 0) {
           const lastFailure = result.failed[result.failed.length - 1];

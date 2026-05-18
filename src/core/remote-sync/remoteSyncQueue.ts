@@ -23,8 +23,10 @@ class RemoteSyncQueueDB extends Dexie {
 
   constructor() {
     super('RemoteSyncQueueDB');
+    // `&[type+recordId]` enforces uniqueness on the compound index so two
+    // concurrent enqueue calls for the same record can't both insert.
     this.version(1).stores({
-      pending: 'queueId, recordId, type, attempts, lastAttemptAt, createdAt, [type+recordId]'
+      pending: 'queueId, recordId, type, attempts, lastAttemptAt, createdAt, &[type+recordId]'
     });
   }
 }
@@ -43,32 +45,36 @@ export async function enqueueFailures(
 ): Promise<void> {
   if (failures.length === 0) return;
   const now = Date.now();
-  // Deduplicate: if an entry already exists for the same (type, recordId), update it.
+  // Each (type, recordId) check + put runs inside a single rw transaction so
+  // concurrent enqueue calls for the same record can't both observe "no
+  // existing" and then both insert.
   for (const failure of failures) {
-    const existing = await queueDB.pending
-      .where('[type+recordId]')
-      .equals([failure.type, failure.recordId])
-      .first();
-    if (existing) {
-      await queueDB.pending.put({
-        ...existing,
-        snapshot: failure.record,
-        attempts: existing.attempts + 1,
-        lastAttemptAt: now,
-        lastError: failure.error
-      });
-    } else {
-      await queueDB.pending.put({
-        queueId: newQueueId(),
-        recordId: failure.recordId,
-        type: failure.type,
-        snapshot: failure.record,
-        attempts: 1,
-        lastAttemptAt: now,
-        lastError: failure.error,
-        createdAt: now
-      });
-    }
+    await queueDB.transaction('rw', queueDB.pending, async () => {
+      const existing = await queueDB.pending
+        .where('[type+recordId]')
+        .equals([failure.type, failure.recordId])
+        .first();
+      if (existing) {
+        await queueDB.pending.put({
+          ...existing,
+          snapshot: failure.record,
+          attempts: existing.attempts + 1,
+          lastAttemptAt: now,
+          lastError: failure.error
+        });
+      } else {
+        await queueDB.pending.put({
+          queueId: newQueueId(),
+          recordId: failure.recordId,
+          type: failure.type,
+          snapshot: failure.record,
+          attempts: 1,
+          lastAttemptAt: now,
+          lastError: failure.error,
+          createdAt: now
+        });
+      }
+    });
   }
 }
 

@@ -20,8 +20,16 @@ interface RemoteSyncWarningDialogProps {
 export function RemoteSyncWarningDialog({ open, onCancel, onContinue }: RemoteSyncWarningDialogProps) {
   const [ack, setAck] = useState(false);
 
+  // Always reset the acknowledgement on open/close so the user must re-confirm
+  // every time the dialog is shown, even after a previous cancel.
   const handleOpenChange = (next: boolean) => {
+    setAck(false);
     if (!next) onCancel();
+  };
+
+  const handleCancel = () => {
+    setAck(false);
+    onCancel();
   };
 
   return (
@@ -68,7 +76,7 @@ export function RemoteSyncWarningDialog({ open, onCancel, onContinue }: RemoteSy
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
+          <Button variant="outline" onClick={handleCancel}>
             Cancel
           </Button>
           <Button

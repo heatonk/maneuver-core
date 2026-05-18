@@ -16,7 +16,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/core/components/ui/alert'
 import { useSettings, type RemoteSyncSettings } from '@/core/contexts/SettingsContext';
 import { useRemoteSyncStatus } from '@/core/remote-sync/useRemoteSyncStatus';
 import { composeRemoteUrl, composeRemoteUrlForDisplay, pingRemote } from '@/core/remote-sync/remoteSyncClient';
-import { drainQueue, runInitialBackfill } from '@/core/remote-sync/remoteSyncService';
+import { drainQueue, runInitialBackfill, setRemoteSyncSettings } from '@/core/remote-sync/remoteSyncService';
 import { RemoteSyncWarningDialog } from './RemoteSyncWarningDialog';
 
 interface RemoteSyncSettingsSheetProps {
@@ -84,11 +84,14 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
   }
 
   async function handleSaveAndBackfill() {
+    // Push the draft directly into the service so the backfill below sees the
+    // new URL synchronously, instead of waiting on React/useEffect propagation
+    // from the context. updateSettings still runs so the value is persisted to
+    // localStorage and other consumers stay in sync.
+    setRemoteSyncSettings(draft);
     updateSettings({ remoteSync: draft });
     setBackfillSummary('Pushing existing local records to remote…');
     try {
-      // Allow the settings update to flush into the service before backfill runs.
-      await new Promise(resolve => setTimeout(resolve, 50));
       const summary = await runInitialBackfill();
       setBackfillSummary(`Backfill complete — ${summary.pushed} pushed, ${summary.failed} failed.`);
     } catch (err) {
