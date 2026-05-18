@@ -172,7 +172,26 @@ export async function runInitialBackfill(): Promise<{ pushed: number; failed: nu
       for (let i = 0; i < bucket.records.length; i += BATCH_SIZE) {
         const batch = bucket.records.slice(i, i + BATCH_SIZE);
         const docs = batch.map(record => toRemoteDoc(record, bucket.type));
-        const result = await pushDocuments(url, docs);
+        let result: PushResult;
+        try {
+          result = await pushDocuments(url, docs);
+        } catch (err) {
+          // The whole batch faulted (network/CORS/etc). Don't abort backfill —
+          // queue every record in the batch for retry and move on so later
+          // buckets still get a chance.
+          const message = err instanceof Error ? err.message : String(err);
+          lastError = message;
+          failed += batch.length;
+          await enqueueFailures(
+            batch.map(record => ({
+              record,
+              type: bucket.type,
+              recordId: localKeyForRecord(record, bucket.type),
+              error: message
+            }))
+          );
+          continue;
+        }
         pushed += result.succeeded.length;
         failed += result.failed.length;
         if (result.failed.length > 0) {
