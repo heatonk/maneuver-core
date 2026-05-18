@@ -6,6 +6,7 @@ import { NavMain } from "@/core/components/dashboard/nav-main"
 // import { NavSecondary } from "@/core/components/dashboard/nav-secondary"
 import { NavUser } from "@/core/components/dashboard/nav-user"
 import { DataAttribution } from "@/core/components/DataAttribution"
+import { RemoteSyncIndicator } from "@/core/components/settings/RemoteSyncIndicator"
 import {
   Sidebar,
   SidebarContent,
@@ -244,6 +245,9 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarFooter>
         <div className="px-2 py-1">
           <DataAttribution sources={['tba', 'nexus']} variant="compact" />
+        </div>
+        <div className="px-2 pb-1">
+          <RemoteSyncIndicator />
         </div>
         <NavUser />
       </SidebarFooter>

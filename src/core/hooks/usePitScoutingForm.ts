@@ -5,6 +5,7 @@ import {
   loadPitScoutingByTeamAndEvent,
   loadPitScoutingByTeam,
 } from "@/core/db/database";
+import { pushAfterSave } from "@/core/remote-sync/remoteSyncService";
 import { toast } from "sonner";
 
 interface PitScoutingFormState {
@@ -203,6 +204,7 @@ export function usePitScoutingForm(): UsePitScoutingFormReturn {
       };
 
       await savePitScoutingEntry(entry);
+      pushAfterSave(entry, 'pit');
 
       toast.success(
         existingEntryId
