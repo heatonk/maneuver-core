@@ -40,6 +40,13 @@ import {
 
 const BATCH_SIZE = 100;
 
+function deepCloneRecord<T extends AnyRecord>(record: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(record);
+  }
+  return JSON.parse(JSON.stringify(record)) as T;
+}
+
 interface ServiceStatus {
   queueSize: number;
   lastSyncAt: number;
@@ -62,10 +69,16 @@ let status: ServiceStatus = {
 };
 const listeners = new Set<StatusListener>();
 
+function snapshotStatus(): ServiceStatus {
+  // Shallow copy is sufficient — ServiceStatus is a flat object of primitives.
+  return { ...status };
+}
+
 function emit(): void {
+  const frozen = snapshotStatus();
   for (const listener of listeners) {
     try {
-      listener(status);
+      listener(frozen);
     } catch (err) {
       console.warn('remoteSyncService listener error:', err);
     }
@@ -78,12 +91,12 @@ function patchStatus(patch: Partial<ServiceStatus>): void {
 }
 
 export function getStatus(): ServiceStatus {
-  return status;
+  return snapshotStatus();
 }
 
 export function subscribeStatus(listener: StatusListener): () => void {
   listeners.add(listener);
-  listener(status);
+  listener(snapshotStatus());
   return () => {
     listeners.delete(listener);
   };
@@ -113,7 +126,9 @@ async function refreshQueueSize(): Promise<void> {
 export function pushAfterSave(record: AnyRecord, type: RecordType): void {
   const url = getActiveUrl();
   if (!url) return;
-  const snapshot = record;
+  // Deep-clone the record so any mutation by the caller after this fire-and-
+  // forget call returns can't affect the document we eventually push.
+  const snapshot = deepCloneRecord(record);
   void (async () => {
     try {
       const result = await pushDocuments(url, [toRemoteDoc(snapshot, type)]);
@@ -198,20 +213,23 @@ export async function runInitialBackfill(): Promise<{ pushed: number; failed: nu
           const lastFailure = result.failed[result.failed.length - 1];
           if (lastFailure) lastError = lastFailure.error;
           // Mirror failures into the queue so the user can drain them later.
-          const fallback = batch[0];
-          if (fallback) {
-            await enqueueFailures(
-              result.failed.map(failure => {
-                const recordId = failure.id.replace(`${getPrefix(bucket.type)}::`, '');
-                const matching = batch.find(record => localKeyForRecord(record, bucket.type) === recordId);
-                return {
-                  record: matching ?? fallback,
-                  type: bucket.type,
-                  recordId,
-                  error: failure.error
-                };
-              })
-            );
+          // If we can't locate the original record for a failure (id mismatch
+          // shouldn't happen, but if it does we'd persist the wrong snapshot
+          // under that recordId), skip the failure rather than enqueue garbage.
+          const failuresToQueue: Array<{ record: AnyRecord; type: RecordType; recordId: string; error: string }> = [];
+          for (const failure of result.failed) {
+            const recordId = failure.id.replace(`${getPrefix(bucket.type)}::`, '');
+            const matching = batch.find(record => localKeyForRecord(record, bucket.type) === recordId);
+            if (!matching) {
+              console.warn(
+                `remoteSyncService: dropping backfill failure with unmatched id "${failure.id}" (recordId="${recordId}", type="${bucket.type}") — no matching record in batch.`
+              );
+              continue;
+            }
+            failuresToQueue.push({ record: matching, type: bucket.type, recordId, error: failure.error });
+          }
+          if (failuresToQueue.length > 0) {
+            await enqueueFailures(failuresToQueue);
           }
         }
       }
