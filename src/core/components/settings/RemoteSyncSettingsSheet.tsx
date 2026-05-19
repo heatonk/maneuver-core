@@ -50,6 +50,7 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
       setDraft(settings.remoteSync);
       setTestState({ kind: 'idle' });
       setBackfillSummary('');
+      setShowPassword(false);
     }
   }, [open, settings.remoteSync]);
 
