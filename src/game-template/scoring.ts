@@ -1,50 +1,126 @@
 /**
- * Game Scoring Calculations
+ * Game Scoring Calculations - 2026 REBUILT
  * 
  * Calculates points for auto, teleop, and endgame phases.
  * 
+ * 2026 SCORING:
+ * - Fuel in active HUB: 1 pt (both phases)
+ * - Auto Climb L1: 15 pts
+ * - Tower L1: 10 pts, L2: 20 pts, L3: 30 pts
+ * 
  * DERIVED FROM: game-schema.ts
- * All point values come from the schema.
  */
 
 import type { ScoringCalculations } from "@/types/game-interfaces";
 import type { ScoutingEntryBase } from "@/core/types/scouting-entry";
-import { toggles, getActionKeys, getActionPoints, getEndgamePoints } from "./game-schema";
+import {
+    toggles,
+    getActionKeys,
+    getActionPoints,
+    getAutoTogglePoints,
+    type AutoToggleKey
+} from "./game-schema";
 
 /**
- * GameData interface derived from schema
- * Auto-includes all action counts and toggles defined in schema
+ * GameData interface for 2026
+ * Uses path-based tracking with counter aggregation
  */
 export interface GameData {
     auto: {
         startPosition: number | null;
-        // Action counters (derived from schema)
-        action1Count?: number;
-        action2Count?: number;
-        action3Count?: number;
-        action4Count?: number;
-        // Auto toggles (derived from schema)
-        autoToggle?: boolean;
+        // Path data for visualization/replay
+        autoPath?: any[];       // Full PathWaypoint array
+        // Note: alliance is stored at top-level scoutingEntry.allianceColor
+        // Fuel counters
+        fuelScoredCount?: number;
+        fuelPassedCount?: number;
+        // Collection counters by location
+        depotCollectCount?: number;
+        outpostCollectCount?: number;
+        // Traversal booleans
+        autoTrench?: boolean;
+        autoBump?: boolean;
+        // Stuck counters (trouble with obstacles)
+        trenchStuckCount?: number;
+        trenchStuckDuration?: number; // milliseconds
+        bumpStuckCount?: number;
+        bumpStuckDuration?: number; // milliseconds
+        // Broken down tracking
+        brokenDownCount?: number;
+        brokenDownDuration?: number; // milliseconds
+        // Other counters
+        foulCommittedCount?: number;
+        // Auto toggles
+        autoClimbL1?: boolean;
+        autoClimbFromSide?: boolean;
+        autoClimbFromMiddle?: boolean;
+        // Climb timing
+        autoClimbStartTimeSecRemaining?: number | null;
         [key: string]: unknown;
     };
     teleop: {
-        // Action counters (derived from schema)
-        action1Count?: number;
-        action2Count?: number;
-        action3Count?: number;
-        action4Count?: number;
-        teleopSpecialCount?: number;
-        // Teleop toggles (derived from schema)
-        teleopToggle?: boolean;
+        // Fuel counters
+        fuelScoredCount?: number;
+        fuelPassedCount?: number;
+        // Action counters
+        stealCount?: number;
+        // Stuck counters
+        trenchStuckCount?: number;
+        trenchStuckDuration?: number; // milliseconds
+        bumpStuckCount?: number;
+        bumpStuckDuration?: number; // milliseconds
+        // Broken down tracking
+        brokenDownCount?: number;
+        brokenDownDuration?: number; // milliseconds
+        // Teleop toggles
+        playedDefense?: boolean;
+        // Climb timing
+        teleopClimbStartTimeSecRemaining?: number | null;
         [key: string]: unknown;
     };
     endgame: {
-        // Endgame options (derived from schema)
-        option1?: boolean;
-        option2?: boolean;
-        option3?: boolean;
-        toggle1?: boolean;
-        toggle2?: boolean;
+        // Tower climb (mutually exclusive)
+        climbL1?: boolean;
+        climbL2?: boolean;
+        climbL3?: boolean;
+        climbFromSide?: boolean;
+        climbFromMiddle?: boolean;
+        // Status
+        climbFailed?: boolean;
+        
+        // Active Phase Roles (multi-select)
+        roleActiveCleanUp?: boolean;
+        roleActivePasser?: boolean;
+        roleActiveDefense?: boolean;
+        roleActiveCycler?: boolean;
+        roleActiveThief?: boolean;
+        
+        // Inactive Phase Roles (multi-select)
+        roleInactiveCleanUp?: boolean;
+        roleInactivePasser?: boolean;
+        roleInactiveDefense?: boolean;
+        roleInactiveCycler?: boolean;
+        roleInactiveThief?: boolean;
+        
+        // Passing zones (multi-select)
+        passedToAllianceFromNeutral?: boolean;
+        passedToAllianceFromOpponent?: boolean;
+        passedToNeutral?: boolean;
+
+        // Teleop traversal confirmation (post-match)
+        usedTrenchInTeleop?: boolean;
+        usedBumpInTeleop?: boolean;
+        
+        // Qualitative accuracy (mutually exclusive)
+        accuracyAll?: boolean;
+        accuracyMost?: boolean;
+        accuracySome?: boolean;
+        accuracyFew?: boolean;
+        accuracyLittle?: boolean;
+        
+        // Corral usage
+        usedCorral?: boolean;
+        
         [key: string]: unknown;
     };
     [key: string]: unknown;
@@ -59,12 +135,21 @@ export const scoringCalculations: ScoringCalculations<ScoutingEntry> = {
         const gameData = entry.gameData as GameData;
         let points = 0;
 
-        // Sum points for all actions with auto points
+        // Sum points for fuel scored in auto
         getActionKeys().forEach(key => {
             const autoPoints = getActionPoints(key, 'auto');
             if (autoPoints > 0) {
                 const count = gameData?.auto?.[`${key}Count`] as number || 0;
                 points += count * autoPoints;
+            }
+        });
+
+        // Add auto climb points if applicable
+        Object.keys(toggles.auto).forEach(key => {
+            const toggleKey = key as AutoToggleKey;
+            const togglePoints = getAutoTogglePoints(toggleKey);
+            if (togglePoints > 0 && gameData?.auto?.[key] === true) {
+                points += togglePoints;
             }
         });
 
@@ -75,7 +160,7 @@ export const scoringCalculations: ScoringCalculations<ScoutingEntry> = {
         const gameData = entry.gameData as GameData;
         let points = 0;
 
-        // Sum points for all actions with teleop points
+        // Sum points for fuel scored in teleop
         getActionKeys().forEach(key => {
             const teleopPoints = getActionPoints(key, 'teleop');
             if (teleopPoints > 0) {
@@ -91,14 +176,16 @@ export const scoringCalculations: ScoringCalculations<ScoutingEntry> = {
         const gameData = entry.gameData as GameData;
         let points = 0;
 
-        // Sum points for all endgame toggles that are true
-        Object.keys(toggles.endgame).forEach(key => {
-            const toggleKey = key as keyof typeof toggles.endgame;
-            const togglePoints = getEndgamePoints(toggleKey);
-            if (gameData?.endgame?.[key] === true) {
-                points += togglePoints;
-            }
-        });
+        // Tower climb - check each level and get points from actions
+        if (gameData?.endgame?.climbL1 === true) {
+            points += getActionPoints('climbL1', 'teleop'); // 10 pts
+        }
+        if (gameData?.endgame?.climbL2 === true) {
+            points += getActionPoints('climbL2', 'teleop'); // 20 pts
+        }
+        if (gameData?.endgame?.climbL3 === true) {
+            points += getActionPoints('climbL3', 'teleop'); // 30 pts
+        }
 
         return points;
     },

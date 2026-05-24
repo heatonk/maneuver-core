@@ -14,14 +14,18 @@ interface FieldStrategyProps {
     activeTab: string;
     selectedTeams?: (number | null)[];  // Optional: team numbers to display on canvas
     onTabChange: (value: string) => void;
+    /** When set, renders draggable React tokens and calls back on token click. */
+    onTokenClick?: (teamNumber: number) => void;
 }
 
 export const FieldStrategy = ({
     fieldImagePath,
     activeTab,
     selectedTeams = [],
-    onTabChange
+    onTabChange,
+    onTokenClick
 }: FieldStrategyProps) => {
+    const useReactTokens = !!onTokenClick;
     return (
         <Card className="w-full">
             <CardContent className="h-[500px] p-4">
@@ -40,6 +44,8 @@ export const FieldStrategy = ({
                                 stageId="autonomous"
                                 selectedTeams={selectedTeams}
                                 onStageChange={onTabChange}
+                                useReactTokens={useReactTokens}
+                                onTokenClick={onTokenClick}
                             />
                         </TabsContent>
 
@@ -50,6 +56,8 @@ export const FieldStrategy = ({
                                 stageId="teleop"
                                 selectedTeams={selectedTeams}
                                 onStageChange={onTabChange}
+                                useReactTokens={useReactTokens}
+                                onTokenClick={onTokenClick}
                             />
                         </TabsContent>
 
@@ -60,6 +68,8 @@ export const FieldStrategy = ({
                                 stageId="endgame"
                                 selectedTeams={selectedTeams}
                                 onStageChange={onTabChange}
+                                useReactTokens={useReactTokens}
+                                onTokenClick={onTokenClick}
                             />
                         </TabsContent>
                     </div>

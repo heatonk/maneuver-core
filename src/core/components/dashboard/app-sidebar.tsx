@@ -75,10 +75,6 @@ const data = {
           url: "/strategy-overview",
         },
         {
-          title: "Match Strategy",
-          url: "/match-strategy",
-        },
-        {
           title: "Match Validation",
           url: "/match-validation",
         },

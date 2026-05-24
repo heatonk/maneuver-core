@@ -20,20 +20,40 @@ import { FieldCanvasHeader } from "./FieldCanvasHeader";
 import { MobileStageControls } from "./MobileStageControls";
 import { DrawingControls } from "./DrawingControls";
 import { FloatingControls } from "./FloatingControls";
+import { SandtableTokenOverlay } from "./SandtableTokenOverlay";
+
+// Module-level stable empty array so `canvasOverlayTeams` doesn't change
+// reference every render when Sandtable's React-token mode is on. Without
+// this, `useCanvasSetup` would rebuild its memoized callback each render
+// and re-trigger the full background-image + canvas resize cycle, which
+// reads as a zoom flash on page load.
+const EMPTY_TEAMS: (number | null)[] = [];
 
 interface FieldCanvasProps {
     fieldImagePath: string;
     stageId?: string;
     onStageChange?: (newStageId: string) => void;
     selectedTeams?: (number | null)[];
+    /**
+     * When true, suppresses the canvas-drawn team-number overlay and renders
+     * draggable React tokens on top of the canvas stack instead. The parent
+     * receives click events via `onTokenClick`.
+     */
+    useReactTokens?: boolean;
+    onTokenClick?: (teamNumber: number) => void;
 }
 
 const FieldCanvas = ({
     fieldImagePath,
     stageId = "default",
     onStageChange,
-    selectedTeams = []
+    selectedTeams = [],
+    useReactTokens = false,
+    onTokenClick
 }: FieldCanvasProps) => {
+    // When React tokens are on, hide the canvas-drawn team numbers by giving
+    // the canvas setup hook the stable EMPTY_TEAMS sentinel.
+    const canvasOverlayTeams = useReactTokens ? EMPTY_TEAMS : selectedTeams;
     // Canvas refs for the 3-layer architecture
     const backgroundCanvasRef = useRef<HTMLCanvasElement>(null);
     const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -94,7 +114,7 @@ const FieldCanvas = ({
         drawingCanvasRef,
         containerRef,
         fullscreenRef,
-        selectedTeams,
+        selectedTeams: canvasOverlayTeams,
         onCanvasReady: handleCanvasReady,
         onDimensionsChange: setCanvasDimensions
     });
@@ -271,6 +291,16 @@ const FieldCanvas = ({
                 }}
                 {...canvasEventHandlers}
             />
+            {/* Layer 4: Sandtable React tokens (optional). Container is pointer-events:none
+                with per-token re-enable, so drawing still works between tokens. */}
+            {useReactTokens && hasValidDimensions && (
+                <SandtableTokenOverlay
+                    selectedTeams={selectedTeams}
+                    containerWidth={canvasDimensions.width}
+                    containerHeight={canvasDimensions.height}
+                    onTokenClick={onTokenClick}
+                />
+            )}
             </div>
         </div>
     );

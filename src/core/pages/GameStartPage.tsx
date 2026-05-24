@@ -30,8 +30,9 @@ import type { ScoutOptionsState } from "@/types";
 const SCOUT_OPTIONS_STORAGE_KEY = "scoutOptions";
 
 const DEFAULT_SCOUT_OPTIONS: ScoutOptionsState = {
-  [CORE_SCOUT_OPTION_KEYS.placeholderOptionA]: false,
-  [CORE_SCOUT_OPTION_KEYS.placeholderOptionB]: false,
+  [CORE_SCOUT_OPTION_KEYS.startAutoCueFromStartConfirmation]: false,
+  [CORE_SCOUT_OPTION_KEYS.startAutoCueFromAutoScreenEntry]: false,
+  [CORE_SCOUT_OPTION_KEYS.autoAdvanceToTeleopAfter20s]: false,
 };
 
 const GameStartPage = () => {
