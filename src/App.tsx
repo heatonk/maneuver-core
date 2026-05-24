@@ -36,7 +36,7 @@ import QRDataTransferPage from "@/core/pages/QRDataTransferPage";
 // import EndgamePage from "@/pages/EndgamePage";
 import TeamStatsPage from "@/core/pages/TeamStatsPage";
 import StrategyOverviewPage from "@/core/pages/StrategyOverviewPage";
-import MatchStrategyPage from "@/core/pages/MatchStrategyPage";
+import SandtablePage from "@/core/pages/SandtablePage";
 import PickListPage from "@/core/pages/PickListPage";
 // import PitScoutingPage from "@/pages/PitScoutingPage";
 import ScoutManagementDashboardPage from "@/core/pages/ScoutManagementDashboardPage";
@@ -117,7 +117,7 @@ function App() {
         {/* <Route path="/endgame" element={<EndgamePage />} /> */}
         <Route path="/team-stats" element={<TeamStatsPage />} />
         <Route path="/strategy-overview" element={<StrategyOverviewPage />} />
-        <Route path="/match-strategy" element={<MatchStrategyPage />} />
+        <Route path="/sandtable" element={<SandtablePage />} />
         <Route path="/pick-list" element={<PickListPage />} />
         {/* <Route path="/pit-scouting" element={<PitScoutingPage />} />  */}
         <Route path="/scout-management" element={<ScoutManagementDashboardPage />} />

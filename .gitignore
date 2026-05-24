@@ -44,3 +44,6 @@ maneuver-core.code-workspace
 
 # Local Netlify folder
 .netlify
+
+# Game template (ignore all files)
+src/game-template/

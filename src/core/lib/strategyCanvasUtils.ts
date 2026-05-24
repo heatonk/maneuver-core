@@ -159,8 +159,8 @@ export const saveAllStrategyCanvases = (matchNumber: string | number, selectedTe
                 const link = document.createElement('a');
                 link.href = dataURL;
                 const filename = matchNumber
-                    ? `match-${matchNumber}-strategy-${new Date().toISOString().slice(0, 10)}.png`
-                    : `match-strategy-complete-${new Date().toISOString().slice(0, 10)}.png`;
+                    ? `sandtable-match-${matchNumber}-${new Date().toISOString().slice(0, 10)}.png`
+                    : `sandtable-${new Date().toISOString().slice(0, 10)}.png`;
                 link.download = filename;
                 link.click();
             }

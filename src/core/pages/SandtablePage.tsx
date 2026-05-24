@@ -1,30 +1,25 @@
 /**
- * Match Strategy Page
- * 
- * Main page for match strategy planning with:
- * - Field drawing on 3 phases (Autonomous, Teleop, Endgame)
- * - Team selection (6 teams: 3 red, 3 blue)
- * - Team stats display (config-driven via match-strategy-config.ts)
- * - Match number lookup
- * - Alliance selection
- * 
- * Year-agnostic design using:
- * - Centralized calculations (useAllTeamStats)
- * - Configurable field image
- * - Config-driven stats display
+ * Sandtable — per-match strategy planning surface.
+ *
+ * Field drawing across Auto / Teleop / Endgame, alliance selection, and
+ * per-team scouting stats on one screen. Year-agnostic via centralized
+ * `useAllTeamStats`, configurable field image, and config-driven stat
+ * display in `match-strategy-config.ts`.
  */
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { MatchHeader } from "@/core/components/MatchStrategy/MatchHeader";
 import { FieldStrategy } from "@/core/components/MatchStrategy/FieldStrategy";
 import { TeamAnalysis } from "@/core/components/MatchStrategy/TeamAnalysis";
+import { SandtableTeamSheet } from "@/core/components/MatchStrategy/SandtableTeamSheet";
 import { clearAllStrategies, saveAllStrategyCanvases } from "@/core/lib/strategyCanvasUtils";
 import { useMatchStrategy } from "@/core/hooks/useMatchStrategy";
-import fieldImage from "@/game-template/assets/field.png";
+import fieldImage from "@/game-template/assets/FieldImage2026.svg";
 
-const MatchStrategyPage = () => {
+const SandtablePage = () => {
     const [activeTab, setActiveTab] = useState("autonomous");
     const [activeStatsTab, setActiveStatsTab] = useState("overall");
+    const [sheetTeam, setSheetTeam] = useState<number | null>(null);
 
     const {
         selectedTeams,
@@ -47,10 +42,21 @@ const MatchStrategyPage = () => {
     const handleClearAll = () => clearAllStrategies(setActiveTab, activeTab);
     const handleSaveAll = () => saveAllStrategyCanvases(matchNumber, selectedTeams, fieldImage);
 
+    const handleTokenClick = useCallback((teamNumber: number) => {
+        setSheetTeam(teamNumber);
+    }, []);
+
+    const sheetTeamSlotIndex = sheetTeam != null
+        ? selectedTeams.findIndex(t => t === sheetTeam)
+        : -1;
+    const sheetTeamAlliance: "red" | "blue" | null =
+        sheetTeamSlotIndex === -1 ? null : sheetTeamSlotIndex < 3 ? "red" : "blue";
+    const sheetTeamStats = sheetTeam != null ? getTeamStats(sheetTeam) : null;
+
     return (
         <div className="min-h-screen w-full flex flex-col items-center px-4 pt-12 pb-24">
             <div className="w-full max-w-7xl">
-                <h1 className="text-2xl font-bold">Match Strategy</h1>
+                <h1 className="text-2xl font-bold">Sandtable</h1>
             </div>
             <div className="flex flex-col items-center gap-4 max-w-7xl w-full">
                 <MatchHeader
@@ -70,6 +76,7 @@ const MatchStrategyPage = () => {
                         activeTab={activeTab}
                         selectedTeams={selectedTeams}
                         onTabChange={setActiveTab}
+                        onTokenClick={handleTokenClick}
                     />
 
                     <TeamAnalysis
@@ -87,8 +94,16 @@ const MatchStrategyPage = () => {
                     />
                 </div>
             </div>
+
+            <SandtableTeamSheet
+                open={sheetTeam != null}
+                onOpenChange={(next) => { if (!next) setSheetTeam(null); }}
+                teamNumber={sheetTeam}
+                alliance={sheetTeamAlliance}
+                teamStats={sheetTeamStats}
+            />
         </div>
     );
 };
 
-export default MatchStrategyPage;
+export default SandtablePage;

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs grep -l \"useSettings\\\\|SettingsProvider\")",
+      "Bash(xargs grep -l \"saveScoutingEntry\\\\|savePitScoutingEntry\")",
+      "Bash(grep -E \"\\\\.tsx?$\")",
+      "Bash(xargs grep -l \"auto-scoring\\\\|teleop-scoring\\\\|endgame\")",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")",
+      "Bash(xargs grep -l \"saveScoutingEntry\\\\|db.scoutingData.put\")",
+      "Bash(npx tsc *)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(npx eslint *)",
+      "Bash(npx vite *)",
+      "Bash(xargs grep -l \"QR\\\\|qr\\\\|scanner\\\\|fountain\")",
+      "Bash(gh repo *)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git mv *)",
+      "Bash(echo \"total error lines: $\\(npx tsc --noEmit 2>&1)",
+      "Bash(echo \"total: $\\(npx tsc --noEmit 2>&1)",
+      "Bash(echo \"---total: $\\(npx tsc --noEmit 2>&1)",
+      "Bash(git rm *)"
+    ]
+  }
+}

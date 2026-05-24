@@ -396,12 +396,23 @@ function extractTBAValue(
     breakdown: Record<string, unknown>,
     tbaPath: string | readonly string[],
     type: TBAMappingType,
-    matchValue?: string
+    matchValue?: string | readonly string[]
 ): number {
+    // Whether a single TBA value satisfies matchValue (scalar = strict equality;
+    // tuple = membership test, so a mapping can match any of several enum
+    // variants, e.g. ['Level1', 'Level2', 'Level3']).
+    const matchesValue = (val: unknown): boolean => {
+        if (matchValue === undefined) return false;
+        if (Array.isArray(matchValue)) {
+            return (matchValue as readonly string[]).includes(val as string);
+        }
+        return val === matchValue;
+    };
+
     // Array of paths - count matching values
     if (Array.isArray(tbaPath)) {
-        if (type === 'countMatching' && matchValue) {
-            return tbaPath.filter(path => getNestedValue(breakdown, path) === matchValue).length;
+        if (type === 'countMatching' && matchValue !== undefined) {
+            return tbaPath.filter(path => matchesValue(getNestedValue(breakdown, path))).length;
         }
         // Sum all values for 'count' type with array
         return tbaPath.reduce((sum, path) => {

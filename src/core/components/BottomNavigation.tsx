@@ -48,8 +48,8 @@ const navItems: BottomNavItem[] = [
   },
   {
     icon: Map,
-    label: 'Match',
-    href: '/match-strategy',
+    label: 'Sandtable',
+    href: '/sandtable',
   },
 ];
 

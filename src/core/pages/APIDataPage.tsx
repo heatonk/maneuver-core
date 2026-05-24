@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { CloudDownload, Loader2 } from 'lucide-react';
 
 // Import hooks and components
 import { useTBAData } from '@/core/hooks/useTBAData';
@@ -11,6 +12,8 @@ import {
   MatchValidationDataDisplay,
   PitDataDisplay
 } from '@/core/components/tba/DataManagement';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/core/components/ui/card';
+import { Button } from '@/core/components/ui/button';
 import {
   DataTypeSelector,
   EventConfigurationCard,
@@ -65,6 +68,9 @@ const APIDataPage: React.FC = () => {
   // Debug Nexus state
   const [debugNexusLoading, setDebugNexusLoading] = useState(false);
   const [nexusEvents, setNexusEvents] = useState<Record<string, unknown> | null>(null);
+
+  // "Load all data" combined action
+  const [loadingAll, setLoadingAll] = useState(false);
 
   // Use the TBA data hook
   const {
@@ -269,6 +275,67 @@ const APIDataPage: React.FC = () => {
     });
   };
 
+  const handleLoadAll = async () => {
+    if (!eventKey.trim()) {
+      toast.error('Please enter an event key');
+      return;
+    }
+
+    executeWithConfirmation(async () => {
+      const trimmedKey = eventKey.trim();
+      setLoadingAll(true);
+      // Aggregate result tracker — per-step toasts still fire from each underlying
+      // loader, so we just note the failures here for a final summary.
+      const failures: string[] = [];
+
+      try {
+        toast.info(`Loading all data for ${trimmedKey}…`);
+
+        try { await fetchMatchDataFromTBA(apiKey, trimmedKey, false, () => { }); }
+        catch (err) { console.error('match schedule failed:', err); failures.push('match schedule'); }
+
+        try { await loadMatchResults(apiKey, trimmedKey, false, () => { }); }
+        catch (err) { console.error('match results failed:', err); failures.push('match results'); }
+
+        try { await fetchValidationMatches(trimmedKey, apiKey, false); }
+        catch (err) { console.error('validation data failed:', err); failures.push('validation data'); }
+
+        try { await loadEventTeams(apiKey, trimmedKey, false, () => { }); }
+        catch (err) { console.error('event teams failed:', err); failures.push('event teams'); }
+
+        // Pit data: reuse cached if present, otherwise fetch + persist + extract.
+        try {
+          const storedPit = getStoredPitData(trimmedKey);
+          if (storedPit.addresses || storedPit.map) {
+            setPitData(storedPit);
+          } else {
+            const fetched = await getNexusPitData(trimmedKey, nexusApiKey);
+            setPitData(fetched);
+            storePitData(trimmedKey, fetched.addresses, fetched.map);
+            if (fetched.addresses && Object.keys(fetched.addresses).length > 0) {
+              try { extractAndStoreTeamsFromPitAddresses(trimmedKey, fetched.addresses); }
+              catch (err) { console.warn('Failed to extract teams from pit addresses:', err); }
+            }
+          }
+        } catch (err) {
+          console.error('pit data failed:', err);
+          failures.push('pit data');
+        }
+
+        setCurrentEvent(trimmedKey);
+        setStoredDataExists(hasStoredEventData(trimmedKey));
+
+        if (failures.length === 0) {
+          toast.success(`Loaded all data for ${trimmedKey}.`);
+        } else {
+          toast.warning(`Loaded data for ${trimmedKey} — failed: ${failures.join(', ')}.`);
+        }
+      } finally {
+        setLoadingAll(false);
+      }
+    });
+  };
+
   const handleDebugNexus = async () => {
     setDebugNexusLoading(true);
     try {
@@ -389,6 +456,41 @@ const APIDataPage: React.FC = () => {
 
       {/* Data Status Card */}
       <DataStatusCard eventKey={eventKey} />
+
+      {/* Combined "load everything" action — runs every category sequentially
+          in a single event-switch confirmation. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CloudDownload className="h-5 w-5" />
+            Load all data for this event
+          </CardTitle>
+          <CardDescription>
+            Pulls match schedules, match results, validation data, the event team
+            list, and pit data in one go. Individual categories below still work
+            if you only need one.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            onClick={handleLoadAll}
+            disabled={!eventKey.trim() || loadingAll}
+            className="w-full sm:w-auto"
+          >
+            {loadingAll ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading all data…
+              </>
+            ) : (
+              <>
+                <CloudDownload className="mr-2 h-4 w-4" />
+                Load all data
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
 
       {/* Data Operations */}
       <DataOperationsCard

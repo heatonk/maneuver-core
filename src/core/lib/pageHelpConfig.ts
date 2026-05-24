@@ -104,8 +104,8 @@ export const PAGE_HELP_CONFIG: Record<string, PageHelpConfig> = {
       "This data helps with alliance selection and match strategy planning."
     ]
   },
-  "/match-strategy": {
-    title: "Match Strategy",
+  "/sandtable": {
+    title: "Sandtable",
     content: [
       "Plan strategy for upcoming matches using scouted data.",
       "1. Draw on the field to visualize robot paths and scoring zones.",
