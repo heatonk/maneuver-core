@@ -322,11 +322,16 @@ const APIDataPage: React.FC = () => {
           failures.push('pit data');
         }
 
-        setCurrentEvent(trimmedKey);
-        setStoredDataExists(hasStoredEventData(trimmedKey));
+        const hasData = hasStoredEventData(trimmedKey);
+        setStoredDataExists(hasData);
+        if (hasData) {
+          setCurrentEvent(trimmedKey);
+        }
 
         if (failures.length === 0) {
           toast.success(`Loaded all data for ${trimmedKey}.`);
+        } else if (!hasData) {
+          toast.error(`Failed to load any data for ${trimmedKey}.`);
         } else {
           toast.warning(`Loaded data for ${trimmedKey} — failed: ${failures.join(', ')}.`);
         }

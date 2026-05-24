@@ -19,7 +19,14 @@
       "Bash(echo \"total error lines: $\\(npx tsc --noEmit 2>&1)",
       "Bash(echo \"total: $\\(npx tsc --noEmit 2>&1)",
       "Bash(echo \"---total: $\\(npx tsc --noEmit 2>&1)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(gh pr *)",
+      "PowerShell(gh pr list --head add_matchspace --json number,title,url,state)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(git restore *)",
+      "Bash(git add *)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx tsc --noEmit; \"exit=$LASTEXITCODE\")"
     ]
   }
 }

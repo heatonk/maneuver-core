@@ -7,7 +7,7 @@
  * display in `match-strategy-config.ts`.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { MatchHeader } from "@/core/components/MatchStrategy/MatchHeader";
 import { FieldStrategy } from "@/core/components/MatchStrategy/FieldStrategy";
 import { TeamAnalysis } from "@/core/components/MatchStrategy/TeamAnalysis";
@@ -45,6 +45,12 @@ const SandtablePage = () => {
     const handleTokenClick = useCallback((teamNumber: number) => {
         setSheetTeam(teamNumber);
     }, []);
+
+    useEffect(() => {
+        if (sheetTeam != null && !selectedTeams.includes(sheetTeam)) {
+            setSheetTeam(null);
+        }
+    }, [selectedTeams, sheetTeam]);
 
     const sheetTeamSlotIndex = sheetTeam != null
         ? selectedTeams.findIndex(t => t === sheetTeam)

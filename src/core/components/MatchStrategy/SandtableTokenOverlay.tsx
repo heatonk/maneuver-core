@@ -134,8 +134,9 @@ export function SandtableTokenOverlay({
                 const next = prev.map(p => ({ ...p }));
                 const current = next[slotIndex];
                 if (!current) return prev;
-                const newX = clamp(current.x * containerWidth + delta.x, 0, containerWidth) / containerWidth;
-                const newY = clamp(current.y * containerHeight + delta.y, 0, containerHeight) / containerHeight;
+                const radius = TOKEN_DIAMETER / 2;
+                const newX = clamp(current.x * containerWidth + delta.x, radius, containerWidth - radius) / containerWidth;
+                const newY = clamp(current.y * containerHeight + delta.y, radius, containerHeight - radius) / containerHeight;
                 next[slotIndex] = { x: newX, y: newY };
                 return next;
             });

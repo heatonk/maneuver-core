@@ -24,7 +24,7 @@ interface ScoutOptionsSheetProps {
   options: ScoutOptionsState;
   onOptionChange: (key: string, value: boolean) => void;
   customContent?: ComponentType<ScoutOptionsContentProps>;
-  trigger?: React.ReactNode;
+  trigger?: React.ReactElement;
 }
 
 export function ScoutOptionsSheet({
@@ -92,14 +92,12 @@ export function ScoutOptionsSheet({
                   name="core-auto-timing-mode"
                   checked={selectedCoreMode === option.key}
                   onChange={() => {
-                    if (option.key === CORE_SCOUT_OPTION_NONE_KEY) {
-                      onOptionChange(CORE_SCOUT_OPTION_KEYS.startAutoCueFromStartConfirmation, false);
-                      onOptionChange(CORE_SCOUT_OPTION_KEYS.startAutoCueFromAutoScreenEntry, false);
-                      onOptionChange(CORE_SCOUT_OPTION_KEYS.autoAdvanceToTeleopAfter20s, false);
-                      return;
+                    onOptionChange(CORE_SCOUT_OPTION_KEYS.startAutoCueFromStartConfirmation, false);
+                    onOptionChange(CORE_SCOUT_OPTION_KEYS.startAutoCueFromAutoScreenEntry, false);
+                    onOptionChange(CORE_SCOUT_OPTION_KEYS.autoAdvanceToTeleopAfter20s, false);
+                    if (option.key !== CORE_SCOUT_OPTION_NONE_KEY) {
+                      onOptionChange(option.key, true);
                     }
-
-                    onOptionChange(option.key, true);
                   }}
                   className="mt-1 h-4 w-4"
                 />
