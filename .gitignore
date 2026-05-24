@@ -44,3 +44,4 @@ maneuver-core.code-workspace
 
 # Local Netlify folder
 .netlify
+.claude/settings.local.json
