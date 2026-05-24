@@ -51,6 +51,8 @@ import { SplashScreen } from '@/core/components/SplashScreen';
 import { FullscreenProvider } from '@/core/contexts/FullscreenContext';
 import { WebRTCProvider } from '@/core/contexts/WebRTCContext';
 import { ScoutProvider } from '@/core/contexts/ScoutContext';
+import { SettingsProvider } from '@/core/contexts/SettingsContext';
+import { RemoteSyncBridge } from '@/core/remote-sync/RemoteSyncBridge';
 import { WebRTCDataRequestDialog } from '@/core/components/webrtc/WebRTCDataRequestDialog';
 import { WebRTCPushedDataDialog } from '@/core/components/webrtc/WebRTCPushedDataDialog';
 import { WebRTCNotifications } from '@/core/components/webrtc/WebRTCNotifications';
@@ -195,21 +197,24 @@ function App() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-      <ScoutProvider>
-        <FullscreenProvider>
-          <WebRTCProvider>
-            <div className="min-h-screen bg-background">
-              <RouterProvider router={router} />
-              <InstallPrompt />
-              <PWAUpdatePrompt />
-              <StatusBarSpacer />
-              <WebRTCDataRequestDialog />
-              <WebRTCPushedDataDialog />
-              <WebRTCNotifications />
-            </div>
-          </WebRTCProvider>
-        </FullscreenProvider>
-      </ScoutProvider>
+      <SettingsProvider>
+        <RemoteSyncBridge />
+        <ScoutProvider>
+          <FullscreenProvider>
+            <WebRTCProvider>
+              <div className="min-h-screen bg-background">
+                <RouterProvider router={router} />
+                <InstallPrompt />
+                <PWAUpdatePrompt />
+                <StatusBarSpacer />
+                <WebRTCDataRequestDialog />
+                <WebRTCPushedDataDialog />
+                <WebRTCNotifications />
+              </div>
+            </WebRTCProvider>
+          </FullscreenProvider>
+        </ScoutProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }

@@ -8,28 +8,57 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { useLocalStorage } from '@/core/hooks/useLocalStorage';
 
+export interface RemoteSyncSettings {
+  enabled: boolean;
+  acknowledgedWarning: boolean;
+  useHttps: boolean;
+  host: string;
+  port: string;
+  databaseName: string;
+  username: string;
+  password: string;
+  lastSyncAt: number;
+  lastError: string;
+}
+
 export interface AppSettings {
   // Theme
   theme: 'light' | 'dark' | 'system';
-  
+
   // Accessibility
   reducedMotion: boolean;
   highContrast: boolean;
   fontSize: 'small' | 'medium' | 'large';
-  
+
   // Notifications
   enableNotifications: boolean;
   soundEnabled: boolean;
-  
+
   // Data
   autoSync: boolean;
   syncInterval: number; // minutes
   confirmBeforeDelete: boolean;
-  
+
   // UI Preferences
   compactMode: boolean;
   showDebugInfo: boolean;
+
+  // Remote CouchDB sync (advanced / unsupported)
+  remoteSync: RemoteSyncSettings;
 }
+
+export const defaultRemoteSyncSettings: RemoteSyncSettings = {
+  enabled: false,
+  acknowledgedWarning: false,
+  useHttps: true,
+  host: '',
+  port: '',
+  databaseName: 'maneuver',
+  username: '',
+  password: '',
+  lastSyncAt: 0,
+  lastError: ''
+};
 
 const defaultSettings: AppSettings = {
   theme: 'system',
@@ -42,7 +71,8 @@ const defaultSettings: AppSettings = {
   syncInterval: 5,
   confirmBeforeDelete: true,
   compactMode: false,
-  showDebugInfo: false
+  showDebugInfo: false,
+  remoteSync: defaultRemoteSyncSettings
 };
 
 interface SettingsContextValue {
@@ -85,10 +115,23 @@ export function SettingsProvider({
   storageKey = 'app-settings',
   defaults
 }: SettingsProviderProps) {
-  const [settings, setSettings, resetSettings] = useLocalStorage<AppSettings>(
+  const [rawSettings, setSettings, resetSettings] = useLocalStorage<AppSettings>(
     storageKey,
     { ...defaultSettings, ...defaults }
   );
+
+  // Backfill defaults for keys missing from older persisted settings (e.g. remoteSync added later).
+  // Order of precedence: built-in defaults < provider defaults < persisted settings.
+  const settings: AppSettings = {
+    ...defaultSettings,
+    ...defaults,
+    ...rawSettings,
+    remoteSync: {
+      ...defaultRemoteSyncSettings,
+      ...(defaults?.remoteSync ?? {}),
+      ...(rawSettings?.remoteSync ?? {})
+    }
+  };
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => ({ ...prev, ...newSettings }));

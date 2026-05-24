@@ -8,6 +8,8 @@
 import { db } from '@/core/db/database';
 import { isSubstantiveComment } from '@/core/lib/commentValidation';
 import { clearScoutingLocalStorage } from '@/core/lib/utils';
+import { pushAfterSave } from '@/core/remote-sync/remoteSyncService';
+import type { MatchRecord } from '@/core/remote-sync/remoteSyncRepo';
 import { toast } from 'sonner';
 import type { DataTransformation } from '@/types';
 
@@ -149,6 +151,7 @@ export async function submitMatchData({
             };
 
             await db.scoutingData.put(entry as never);
+            pushAfterSave(entry as unknown as MatchRecord, 'match');
 
             try {
                 await maybeRecordCommentAchievement(existingEntry?.comments);
@@ -199,6 +202,7 @@ export async function submitMatchData({
 
         // Save to database
         await db.scoutingData.put(scoutingEntry as never);
+        pushAfterSave(scoutingEntry as unknown as MatchRecord, 'match');
 
         try {
             await maybeRecordCommentAchievement(existingEntry?.comments);

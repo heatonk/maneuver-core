@@ -254,6 +254,33 @@ gamificationDB.open().catch(error => {
 });
 
 // ============================================================================
+// WRITE NOTIFICATION HOOK
+// ============================================================================
+//
+// External modules (specifically src/core/remote-sync) register a listener
+// here to mirror every successful gamification write to a remote backup.
+// Kept as a simple callback to avoid pulling gamification → core dependencies.
+
+export type GamificationWriteKind = 'scout' | 'prediction' | 'achievement';
+type GamificationWriteRecord = Scout | MatchPrediction | ScoutAchievement;
+type GamificationWriteListener = (record: GamificationWriteRecord, kind: GamificationWriteKind) => void;
+
+let gamificationWriteListener: GamificationWriteListener | null = null;
+
+export function setGamificationWriteListener(listener: GamificationWriteListener | null): void {
+    gamificationWriteListener = listener;
+}
+
+function notifyWrite(record: GamificationWriteRecord | undefined, kind: GamificationWriteKind): void {
+    if (!record || !gamificationWriteListener) return;
+    try {
+        gamificationWriteListener(record, kind);
+    } catch (err) {
+        console.warn('Gamification write listener error:', err);
+    }
+}
+
+// ============================================================================
 // SCOUT PROFILE OPERATIONS
 // ============================================================================
 
@@ -274,6 +301,7 @@ export const getOrCreateScout = async (name: string): Promise<Scout> => {
     if (existingScout) {
         existingScout.lastUpdated = Date.now();
         await gamificationDB.scouts.put(existingScout);
+        notifyWrite(existingScout, 'scout');
         return existingScout;
     }
 
@@ -291,6 +319,7 @@ export const getOrCreateScout = async (name: string): Promise<Scout> => {
     };
 
     await gamificationDB.scouts.put(newScout);
+    notifyWrite(newScout, 'scout');
     return newScout;
 };
 
@@ -321,6 +350,7 @@ export const updateScoutPoints = async (name: string, pointsToAdd: number): Prom
         scout.stakes += pointsToAdd;
         scout.lastUpdated = Date.now();
         await gamificationDB.scouts.put(scout);
+        notifyWrite(scout, 'scout');
     }
 };
 
@@ -354,6 +384,7 @@ export const updateScoutStats = async (
 
         scout.lastUpdated = Date.now();
         await gamificationDB.scouts.put(scout);
+        notifyWrite(scout, 'scout');
     }
 };
 
@@ -382,6 +413,8 @@ export const incrementScoutDetailedComments = async (name: string, incrementBy: 
                 scout.lastUpdated = Date.now();
             });
     });
+    const updated = await gamificationDB.scouts.get(key);
+    notifyWrite(updated, 'scout');
 };
 
 /**
@@ -433,6 +466,7 @@ export const createMatchPrediction = async (
         existingPrediction.predictedWinner = predictedWinner;
         existingPrediction.timestamp = Date.now();
         await gamificationDB.predictions.put(existingPrediction);
+        notifyWrite(existingPrediction, 'prediction');
         return existingPrediction;
     }
 
@@ -447,6 +481,7 @@ export const createMatchPrediction = async (
     };
 
     await gamificationDB.predictions.put(prediction);
+    notifyWrite(prediction, 'prediction');
 
     // Ensure scout exists
     await getOrCreateScout(normalizedScoutName);
@@ -517,6 +552,8 @@ export const getAllPredictionsForMatch = async (
  */
 export const markPredictionAsVerified = async (predictionId: string): Promise<void> => {
     await gamificationDB.predictions.update(predictionId, { verified: true });
+    const updated = await gamificationDB.predictions.get(predictionId);
+    notifyWrite(updated, 'prediction');
 };
 
 // ============================================================================
@@ -541,12 +578,14 @@ export const unlockAchievement = async (
         .first();
 
     if (!existing) {
-        await gamificationDB.scoutAchievements.put({
+        const achievement: ScoutAchievement = {
             id: `${normalizedScoutName}_${achievementId}_${Date.now()}`,
             scoutName: normalizedScoutName,
             achievementId,
             unlockedAt: Date.now(),
-        });
+        };
+        await gamificationDB.scoutAchievements.put(achievement);
+        notifyWrite(achievement, 'achievement');
     }
 };
 
