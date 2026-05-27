@@ -439,10 +439,19 @@ function extractTBAValue(
  * Get nested value from object using dot notation
  * e.g., getNestedValue(obj, 'a.b.c') gets obj.a.b.c
  */
-function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+export function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     return path.split('.').reduce((current, key) => {
         return current && typeof current === 'object' ? (current as Record<string, unknown>)[key] : undefined;
     }, obj as unknown);
+}
+
+/**
+ * Strip an event-key prefix from a match key so that scouted keys like `qm15`
+ * line up with TBA keys like `2025mrcmp_qm15`. Inputs without a `_` pass through.
+ */
+export function normalizeMatchKey(matchKey: string): string {
+    const idx = matchKey.indexOf('_');
+    return idx === -1 ? matchKey : matchKey.slice(idx + 1);
 }
 
 // ============================================================================

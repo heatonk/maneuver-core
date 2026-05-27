@@ -31,6 +31,8 @@ import {
     sortMatchList,
     extractTeamNumbers,
     parseMatchKey,
+    getNestedValue,
+    normalizeMatchKey,
 } from '@/core/lib/matchValidationUtils';
 import { useTBAMatchData } from '@/core/hooks/useTBAMatchData';
 import {
@@ -38,7 +40,12 @@ import {
     getEventValidationResults,
     clearEventValidationResults,
 } from '@/core/lib/tbaCache';
-import { getAllMappedActionKeys, getAllMappedToggleKeys } from '@/game-template/game-schema';
+import {
+    getAllMappedActionKeys,
+    getAllMappedToggleKeys,
+    getActionMapping,
+    getToggleMapping,
+} from '@/game-template/game-schema';
 import { getEntriesByEvent } from '@/core/db/scoutingDatabase';
 import { toast } from 'sonner';
 
@@ -177,10 +184,15 @@ export function useMatchValidation({
             const scoutingEntries = await getScoutingEntriesForEvent(eventKey);
 
             for (const item of items) {
-                // Find scouting entries for this match
+                // Find scouting entries for this match.
+                // Scouted entries store the bare match key ("qm15", "sf1m1") while
+                // TBA's matchKey is event-prefixed ("2025mrcmp_qm15"); normalize
+                // both sides before comparing. Matching only on matchNumber would
+                // cross-contaminate elim matches with qual matches that share a
+                // number.
+                const normalizedItemKey = normalizeMatchKey(item.matchKey);
                 const matchEntries = scoutingEntries.filter(
-                    entry => entry.matchKey === item.matchKey ||
-                        entry.matchNumber === item.matchNumber
+                    entry => normalizeMatchKey(entry.matchKey) === normalizedItemKey
                 );
 
                 // Count scouted teams per alliance
@@ -303,7 +315,7 @@ export function useMatchValidation({
             }
 
             // Get scouting entries for this match
-            const entries = await getScoutingEntriesForMatch(eventKey, match.matchKey, match.matchNumber);
+            const entries = await getScoutingEntriesForMatch(eventKey, match.matchKey);
             console.log('[Validation] Found', entries.length, 'scouting entries for:', match.matchKey);
 
             if (entries.length === 0) {
@@ -531,12 +543,17 @@ async function getScoutingEntriesForEvent(eventKey: string): Promise<Array<{
 }
 
 /**
- * Get scouting entries for a specific match
+ * Get scouting entries for a specific match.
+ *
+ * Normalizes both sides of the comparison so that scouted entries (which save
+ * the bare match key like `qm15` or `sf1m1`) line up with the event-prefixed
+ * TBA match key (`2025mrcmp_qm15`). We deliberately don't fall back to a
+ * matchNumber-only compare — that would let `sf1m1` (matchNumber 1) pick up
+ * `qm1` entries.
  */
 async function getScoutingEntriesForMatch(
     eventKey: string,
-    matchKey: string,
-    matchNumber: number
+    matchKey: string
 ): Promise<Array<{
     teamNumber: number;
     allianceColor: 'red' | 'blue';
@@ -544,11 +561,24 @@ async function getScoutingEntriesForMatch(
     gameData: Record<string, unknown>;
 }>> {
     const entries = await getScoutingEntriesForEvent(eventKey);
-    return entries.filter(e => e.matchKey === matchKey || e.matchNumber === matchNumber);
+    const normalized = normalizeMatchKey(matchKey);
+    return entries.filter(e => normalizeMatchKey(e.matchKey) === normalized);
 }
 
 /**
- * Aggregate scouting entries into alliance data
+ * Aggregate scouting entries into alliance data by walking the `scoutedPath`
+ * declared on each schema mapping. The old flatten-and-guess implementation
+ * tried matching by mapping key (e.g. `autoFuelScored`) against stored fields
+ * (`fuelScoredCount`) — they never lined up, so every scouted value summed to
+ * 0 and validation reported every match as failing with no scouted data.
+ *
+ * Actions: sum each `scoutedPath` value across every entry. When a mapping
+ * has multiple paths (e.g. `totalFuelScored` = auto + teleop), sum every
+ * listed path on every entry.
+ *
+ * Toggles: per-entry, count 1 if the `scoutedPath` value is truthy. When a
+ * mapping lists multiple paths (e.g. `autoClimbSuccess` covers L1/L2/L3),
+ * the entry counts at most once if ANY listed path is truthy.
  */
 function aggregateScoutingData(
     alliance: 'red' | 'blue',
@@ -569,72 +599,48 @@ function aggregateScoutingData(
         scoutedTeamsCount: entries.length,
     };
 
-    // Initialize action counts
     const actionKeys = getAllMappedActionKeys();
     for (const key of actionKeys) {
         data.actions[key] = 0;
     }
 
-    // Initialize toggle counts
     const toggleKeys = getAllMappedToggleKeys();
     for (const key of toggleKeys) {
         data.toggles[key] = 0;
     }
 
-    // Aggregate from entries
+    const toPaths = (path: string | readonly string[]): readonly string[] =>
+        Array.isArray(path) ? path : [path as string];
+
+    const isTruthy = (value: unknown): boolean =>
+        value === true || value === 1 || value === 'Yes' || value === 'true';
+
     for (const entry of entries) {
         const gameData = entry.gameData;
-        console.log('[Aggregate] Processing entry for team', entry.teamNumber, 'gameData:', gameData);
 
-        // Get flattened values from nested gameData structure
-        // gameData can be { auto: {...}, teleop: {...}, endgame: {...} } or flat
-        const flatGameData: Record<string, unknown> = {};
-
-        // Check if gameData is nested (has auto/teleop/endgame phases)
-        const phases = ['auto', 'teleop', 'endgame'];
-        for (const phase of phases) {
-            const phaseData = gameData[phase] as Record<string, unknown> | undefined;
-            if (phaseData && typeof phaseData === 'object') {
-                // Flatten phase data - extract values from nested structure
-                for (const [key, value] of Object.entries(phaseData)) {
-                    flatGameData[key] = value;
+        for (const key of actionKeys) {
+            const mapping = getActionMapping(key);
+            const paths = toPaths(mapping.scoutedPath);
+            let sum = 0;
+            for (const path of paths) {
+                const value = getNestedValue(gameData, path);
+                if (typeof value === 'number') {
+                    sum += value;
                 }
             }
+            data.actions[key] = (data.actions[key] ?? 0) + sum;
         }
 
-        // Also include any top-level flat values
-        for (const [key, value] of Object.entries(gameData)) {
-            if (!phases.includes(key)) {
-                flatGameData[key] = value;
-            }
-        }
-
-        console.log('[Aggregate] Flattened gameData:', flatGameData);
-
-        // Sum actions
-        for (const key of actionKeys) {
-            // Try both flat key and phase-prefixed keys
-            let value = flatGameData[key];
-            if (value === undefined) {
-                // Try with phase prefixes (e.g., action1Count might be stored as is)
-                value = flatGameData[`${key}Count`];
-            }
-            if (typeof value === 'number') {
-                data.actions[key] = (data.actions[key] ?? 0) + value;
-            }
-        }
-
-        // Count toggles
         for (const key of toggleKeys) {
-            const value = flatGameData[key];
-            console.log('[Aggregate] Toggle', key, '=', value, 'type:', typeof value);
-            if (value === true || value === 1) {
+            const mapping = getToggleMapping(key);
+            const paths = toPaths(mapping.scoutedPath);
+            const anyTruthy = paths.some(path => isTruthy(getNestedValue(gameData, path)));
+            if (anyTruthy) {
                 data.toggles[key] = (data.toggles[key] ?? 0) + 1;
             }
         }
     }
 
-    // Track missing teams
     const expectedTeams = alliance === 'red' ? match.redTeams : match.blueTeams;
     const scoutedTeams = new Set(entries.map(e => e.teamNumber.toString()));
     data.missingTeams = expectedTeams.filter(t => !scoutedTeams.has(t));

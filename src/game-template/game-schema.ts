@@ -472,22 +472,29 @@ export const tbaValidation = {
 
     /**
      * Action mappings - maps scouting action keys to TBA breakdown fields
-     * TODO: Update with actual 2026 TBA breakdown paths when available
+     *
+     * `scoutedPath` is the dotted path into the stored scouting entry's `gameData`
+     * (e.g. `'auto.fuelScoredCount'`). When it's an array, the aggregator sums
+     * every listed path across teams — used for "total"-style fields that span
+     * multiple phases.
      */
     actionMappings: {
         // Fuel scoring by phase and total
         autoFuelScored: {
             tbaPath: 'hubScore.autoCount',
+            scoutedPath: 'auto.fuelScoredCount',
             type: 'count' as TBAMappingType,
             category: 'auto-fuel',
         },
         teleopFuelScored: {
             tbaPath: 'hubScore.teleopCount',
+            scoutedPath: 'teleop.fuelScoredCount',
             type: 'count' as TBAMappingType,
             category: 'teleop-fuel',
         },
         totalFuelScored: {
             tbaPath: 'hubScore.totalCount',
+            scoutedPath: ['auto.fuelScoredCount', 'teleop.fuelScoredCount'],
             type: 'count' as TBAMappingType,
             category: 'total-fuel',
         },
@@ -495,11 +502,17 @@ export const tbaValidation = {
 
     /**
      * Toggle mappings - maps scouting toggles to TBA breakdown fields
+     *
+     * `scoutedPath` is the dotted path into the stored `gameData`. For toggles the
+     * aggregator counts one per team when the value is truthy. When it's an
+     * array of paths, a team counts once if ANY listed path is truthy (e.g.
+     * `autoClimbSuccess` counts a team that climbed to L1, L2, OR L3).
      */
     toggleMappings: {
         // Auto tower climb success (alliance robot slots)
         autoClimbSuccess: {
             tbaPath: ['autoTowerRobot1', 'autoTowerRobot2', 'autoTowerRobot3'],
+            scoutedPath: ['auto.autoClimbL1', 'auto.autoClimbL2', 'auto.autoClimbL3'],
             type: 'countMatchingAny' as TBAMappingType,
             matchValue: ['Level1', 'Level2', 'Level3'],
             category: 'auto-climb',
@@ -507,6 +520,7 @@ export const tbaValidation = {
         // Auto mobility
         leftStartZone: {
             tbaPath: ['autoLineRobot1', 'autoLineRobot2', 'autoLineRobot3'],
+            scoutedPath: 'auto.leftStartZone',
             type: 'countMatching' as TBAMappingType,
             matchValue: 'Yes',
             category: 'mobility',
@@ -514,18 +528,21 @@ export const tbaValidation = {
         // Endgame climb levels
         climbL1: {
             tbaPath: ['endGameTowerRobot1', 'endGameTowerRobot2', 'endGameTowerRobot3'],
+            scoutedPath: 'endgame.climbL1',
             type: 'countMatching' as TBAMappingType,
             matchValue: 'Level1',
             category: 'endgame',
         },
         climbL2: {
             tbaPath: ['endGameTowerRobot1', 'endGameTowerRobot2', 'endGameTowerRobot3'],
+            scoutedPath: 'endgame.climbL2',
             type: 'countMatching' as TBAMappingType,
             matchValue: 'Level2',
             category: 'endgame',
         },
         climbL3: {
             tbaPath: ['endGameTowerRobot1', 'endGameTowerRobot2', 'endGameTowerRobot3'],
+            scoutedPath: 'endgame.climbL3',
             type: 'countMatching' as TBAMappingType,
             matchValue: 'Level3',
             category: 'endgame',
