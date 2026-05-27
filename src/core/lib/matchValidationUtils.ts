@@ -454,6 +454,91 @@ export function normalizeMatchKey(matchKey: string): string {
     return idx === -1 ? matchKey : matchKey.slice(idx + 1);
 }
 
+/**
+ * Aggregate scouting entries into alliance data by walking the `scoutedPath`
+ * declared on each schema mapping.
+ *
+ * Actions: sum each `scoutedPath` value across every entry. When a mapping
+ * lists multiple paths (e.g. `totalFuelScored` = auto + teleop), sum every
+ * listed path on every entry.
+ *
+ * Toggles: per-entry, count 1 if the `scoutedPath` value is truthy. When a
+ * mapping lists multiple paths (e.g. `autoClimbSuccess` covers L1/L2/L3),
+ * the entry counts at most once if ANY listed path is truthy.
+ *
+ * The naming mismatch this fixes: storage uses phase-keyed counts
+ * (`auto.fuelScoredCount`), the schema's mapping key is `autoFuelScored`.
+ * The previous "flatten gameData then match by key" approach never lined
+ * those up, so every scouted value summed to 0 and every match came back
+ * failed with "no data collected."
+ */
+export function aggregateScoutingData(
+    alliance: 'red' | 'blue',
+    match: Pick<MatchListItem, 'matchKey' | 'matchNumber' | 'redTeams' | 'blueTeams'>,
+    entries: Array<{ teamNumber: number; scoutName: string; gameData: Record<string, unknown> }>
+): ScoutedAllianceData {
+    const data: ScoutedAllianceData = {
+        alliance,
+        matchKey: match.matchKey,
+        matchNumber: match.matchNumber.toString(),
+        eventKey: match.matchKey.split('_')[0] || '',
+        teams: entries.map(e => e.teamNumber.toString()),
+        scoutNames: entries.map(e => e.scoutName),
+        actions: {},
+        toggles: {},
+        missingTeams: [],
+        scoutedTeamsCount: entries.length,
+    };
+
+    const actionKeys = getAllMappedActionKeys();
+    for (const key of actionKeys) {
+        data.actions[key] = 0;
+    }
+
+    const toggleKeys = getAllMappedToggleKeys();
+    for (const key of toggleKeys) {
+        data.toggles[key] = 0;
+    }
+
+    const toPaths = (path: string | readonly string[]): readonly string[] =>
+        Array.isArray(path) ? path : [path as string];
+
+    const isTruthy = (value: unknown): boolean =>
+        value === true || value === 1 || value === 'Yes' || value === 'true';
+
+    for (const entry of entries) {
+        const gameData = entry.gameData;
+
+        for (const key of actionKeys) {
+            const mapping = getActionMapping(key);
+            const paths = toPaths(mapping.scoutedPath);
+            let sum = 0;
+            for (const path of paths) {
+                const value = getNestedValue(gameData, path);
+                if (typeof value === 'number') {
+                    sum += value;
+                }
+            }
+            data.actions[key] = (data.actions[key] ?? 0) + sum;
+        }
+
+        for (const key of toggleKeys) {
+            const mapping = getToggleMapping(key);
+            const paths = toPaths(mapping.scoutedPath);
+            const anyTruthy = paths.some(path => isTruthy(getNestedValue(gameData, path)));
+            if (anyTruthy) {
+                data.toggles[key] = (data.toggles[key] ?? 0) + 1;
+            }
+        }
+    }
+
+    const expectedTeams = alliance === 'red' ? match.redTeams : match.blueTeams;
+    const scoutedTeams = new Set(entries.map(e => e.teamNumber.toString()));
+    data.missingTeams = expectedTeams.filter(t => !scoutedTeams.has(t));
+
+    return data;
+}
+
 // ============================================================================
 // Validation Comparison
 // ============================================================================

@@ -31,8 +31,8 @@ import {
     sortMatchList,
     extractTeamNumbers,
     parseMatchKey,
-    getNestedValue,
     normalizeMatchKey,
+    aggregateScoutingData,
 } from '@/core/lib/matchValidationUtils';
 import { useTBAMatchData } from '@/core/hooks/useTBAMatchData';
 import {
@@ -40,12 +40,6 @@ import {
     getEventValidationResults,
     clearEventValidationResults,
 } from '@/core/lib/tbaCache';
-import {
-    getAllMappedActionKeys,
-    getAllMappedToggleKeys,
-    getActionMapping,
-    getToggleMapping,
-} from '@/game-template/game-schema';
 import { getEntriesByEvent } from '@/core/db/scoutingDatabase';
 import { toast } from 'sonner';
 
@@ -565,88 +559,6 @@ async function getScoutingEntriesForMatch(
     return entries.filter(e => normalizeMatchKey(e.matchKey) === normalized);
 }
 
-/**
- * Aggregate scouting entries into alliance data by walking the `scoutedPath`
- * declared on each schema mapping. The old flatten-and-guess implementation
- * tried matching by mapping key (e.g. `autoFuelScored`) against stored fields
- * (`fuelScoredCount`) — they never lined up, so every scouted value summed to
- * 0 and validation reported every match as failing with no scouted data.
- *
- * Actions: sum each `scoutedPath` value across every entry. When a mapping
- * has multiple paths (e.g. `totalFuelScored` = auto + teleop), sum every
- * listed path on every entry.
- *
- * Toggles: per-entry, count 1 if the `scoutedPath` value is truthy. When a
- * mapping lists multiple paths (e.g. `autoClimbSuccess` covers L1/L2/L3),
- * the entry counts at most once if ANY listed path is truthy.
- */
-function aggregateScoutingData(
-    alliance: 'red' | 'blue',
-    match: MatchListItem,
-    entries: Array<{ teamNumber: number; scoutName: string; gameData: Record<string, unknown> }>
-): ScoutedAllianceData {
-
-    const data: ScoutedAllianceData = {
-        alliance,
-        matchKey: match.matchKey,
-        matchNumber: match.matchNumber.toString(),
-        eventKey: match.matchKey.split('_')[0] || '',
-        teams: entries.map(e => e.teamNumber.toString()),
-        scoutNames: entries.map(e => e.scoutName),
-        actions: {},
-        toggles: {},
-        missingTeams: [],
-        scoutedTeamsCount: entries.length,
-    };
-
-    const actionKeys = getAllMappedActionKeys();
-    for (const key of actionKeys) {
-        data.actions[key] = 0;
-    }
-
-    const toggleKeys = getAllMappedToggleKeys();
-    for (const key of toggleKeys) {
-        data.toggles[key] = 0;
-    }
-
-    const toPaths = (path: string | readonly string[]): readonly string[] =>
-        Array.isArray(path) ? path : [path as string];
-
-    const isTruthy = (value: unknown): boolean =>
-        value === true || value === 1 || value === 'Yes' || value === 'true';
-
-    for (const entry of entries) {
-        const gameData = entry.gameData;
-
-        for (const key of actionKeys) {
-            const mapping = getActionMapping(key);
-            const paths = toPaths(mapping.scoutedPath);
-            let sum = 0;
-            for (const path of paths) {
-                const value = getNestedValue(gameData, path);
-                if (typeof value === 'number') {
-                    sum += value;
-                }
-            }
-            data.actions[key] = (data.actions[key] ?? 0) + sum;
-        }
-
-        for (const key of toggleKeys) {
-            const mapping = getToggleMapping(key);
-            const paths = toPaths(mapping.scoutedPath);
-            const anyTruthy = paths.some(path => isTruthy(getNestedValue(gameData, path)));
-            if (anyTruthy) {
-                data.toggles[key] = (data.toggles[key] ?? 0) + 1;
-            }
-        }
-    }
-
-    const expectedTeams = alliance === 'red' ? match.redTeams : match.blueTeams;
-    const scoutedTeams = new Set(entries.map(e => e.teamNumber.toString()));
-    data.missingTeams = expectedTeams.filter(t => !scoutedTeams.has(t));
-
-    return data;
-}
 
 /**
  * Build alliance validation result
