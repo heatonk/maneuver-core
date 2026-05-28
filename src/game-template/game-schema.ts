@@ -497,6 +497,11 @@ export const tbaValidation = {
             scoutedPath: ['auto.fuelScoredCount', 'teleop.fuelScoredCount'],
             type: 'count' as TBAMappingType,
             category: 'total-fuel',
+            // Aggregates the per-phase fuel counts. Validation still compares it
+            // against TBA's hubScore.totalCount, but it MUST be excluded from
+            // any "sum across all actions" math or the per-phase counts get
+            // double-counted.
+            isAggregate: true,
         },
     },
 

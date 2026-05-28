@@ -663,8 +663,15 @@ function buildAllianceValidation(
 
     const status = determineOverallStatus(criticalCount, warningCount, config);
 
-    // Calculate total scouted points (simplified - would need game-specific logic)
-    const totalScoutedPoints = Object.values(scouted.actions).reduce((a, b) => a + b, 0);
+    // Sum scouted counts, but skip mappings flagged `isAggregate` — those (e.g.
+    // `totalFuelScored`) already re-sum per-phase counts via their scoutedPath
+    // array, so including them would double-count every component.
+    const totalScoutedPoints = getAllMappedActionKeys()
+        .filter(key => {
+            const mapping = getActionMapping(key) as { isAggregate?: boolean };
+            return !mapping.isAggregate;
+        })
+        .reduce((sum, key) => sum + (scouted.actions[key] ?? 0), 0);
 
     return {
         alliance,
