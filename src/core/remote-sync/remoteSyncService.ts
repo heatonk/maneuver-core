@@ -14,6 +14,10 @@ import {
   gamificationDB,
   getAllScouts
 } from '@/game-template/gamification/database';
+import {
+  loadAllRepoLinks,
+  teamGitHubLinksDB
+} from '@/core/db/teamGitHubLinksDB';
 import type { RemoteSyncSettings } from '@/core/contexts/SettingsContext';
 import { composeRemoteUrl, ensureDatabaseExists, pingRemote, pullAllDocuments, pushDocuments } from './remoteSyncClient';
 import type { PushResult } from './remoteSyncClient';
@@ -28,7 +32,8 @@ import {
   type PitRecord,
   type PredictionRecord,
   type RecordType,
-  type ScoutRecord
+  type ScoutRecord,
+  type TeamRepoRecord
 } from './remoteSyncRepo';
 import {
   enqueueFailures,
@@ -178,7 +183,8 @@ export async function runInitialBackfill(): Promise<{ pushed: number; failed: nu
       { type: 'pit', records: await loadAllPitScoutingEntries() as PitRecord[] },
       { type: 'gam-scout', records: await getAllScouts() as ScoutRecord[] },
       { type: 'gam-prediction', records: await gamificationDB.predictions.toArray() as PredictionRecord[] },
-      { type: 'gam-achievement', records: await gamificationDB.scoutAchievements.toArray() as AchievementRecord[] }
+      { type: 'gam-achievement', records: await gamificationDB.scoutAchievements.toArray() as AchievementRecord[] },
+      { type: 'tgh-repo', records: await loadAllRepoLinks() as TeamRepoRecord[] }
     ];
     let pushed = 0;
     let failed = 0;
@@ -336,6 +342,7 @@ export async function pullAll(): Promise<{
   gamificationScouts: number;
   gamificationPredictions: number;
   gamificationAchievements: number;
+  teamRepos: number;
 }> {
   const url = getActiveUrl();
   if (!url) throw new Error('Remote sync URL is not configured');
@@ -346,6 +353,7 @@ export async function pullAll(): Promise<{
     const scoutDocs = await pullAllDocuments(url, getPrefix('gam-scout'));
     const predictionDocs = await pullAllDocuments(url, getPrefix('gam-prediction'));
     const achievementDocs = await pullAllDocuments(url, getPrefix('gam-achievement'));
+    const teamRepoDocs = await pullAllDocuments(url, getPrefix('tgh-repo'));
 
     const matchRecords = matchDocs
       .map(doc => fromRemoteDoc<MatchRecord>(doc, 'match'))
@@ -362,6 +370,9 @@ export async function pullAll(): Promise<{
     const achievementRecords = achievementDocs
       .map(doc => fromRemoteDoc<AchievementRecord>(doc, 'gam-achievement'))
       .filter((r): r is AchievementRecord => r !== null);
+    const teamRepoRecords = teamRepoDocs
+      .map(doc => fromRemoteDoc<TeamRepoRecord>(doc, 'tgh-repo'))
+      .filter((r): r is TeamRepoRecord => r !== null);
 
     if (matchRecords.length > 0) {
       await importScoutingData({ entries: matchRecords }, 'append');
@@ -387,6 +398,12 @@ export async function pullAll(): Promise<{
       // Composite primary key is [scoutName, achievementId]; bulkPut tolerates that natively.
       await gamificationDB.scoutAchievements.bulkPut(achievementRecords);
     }
+    if (teamRepoRecords.length > 0) {
+      // Repo links are keyed by teamNumber, so bulkPut naturally upserts. Remote
+      // is authoritative — a more recently-discovered link will overwrite the
+      // local copy, which matches user intent (share & sync repo mappings).
+      await teamGitHubLinksDB.repos.bulkPut(teamRepoRecords);
+    }
 
     patchStatus({ lastSyncAt: Date.now(), lastError: '' });
     return {
@@ -394,7 +411,8 @@ export async function pullAll(): Promise<{
       pit: pitRecords.length,
       gamificationScouts: scoutRecords.length,
       gamificationPredictions: predictionRecords.length,
-      gamificationAchievements: achievementRecords.length
+      gamificationAchievements: achievementRecords.length,
+      teamRepos: teamRepoRecords.length
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);

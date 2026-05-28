@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { AlertTriangleIcon, CheckCircle2Icon, EyeIcon, EyeOffIcon, Loader2Icon, QrCodeIcon, RefreshCwIcon, ScanLineIcon, XCircleIcon } from 'lucide-react';
+import { AlertTriangleIcon, CheckCircle2Icon, CloudDownloadIcon, EyeIcon, EyeOffIcon, Loader2Icon, QrCodeIcon, RefreshCwIcon, ScanLineIcon, XCircleIcon } from 'lucide-react';
 import {
   Sheet,
   SheetContent,
@@ -17,7 +17,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/core/components/ui/alert'
 import { useSettings, type RemoteSyncSettings } from '@/core/contexts/SettingsContext';
 import { useRemoteSyncStatus } from '@/core/remote-sync/useRemoteSyncStatus';
 import { composeRemoteUrl, composeRemoteUrlForDisplay, pingRemote } from '@/core/remote-sync/remoteSyncClient';
-import { drainQueue, runInitialBackfill, setRemoteSyncSettings } from '@/core/remote-sync/remoteSyncService';
+import { drainQueue, pullAll, runInitialBackfill, setRemoteSyncSettings } from '@/core/remote-sync/remoteSyncService';
 import { RemoteSyncWarningDialog } from './RemoteSyncWarningDialog';
 import { RemoteSyncShareQRDialog } from './RemoteSyncShareQRDialog';
 import { RemoteSyncScanQRDialog } from './RemoteSyncScanQRDialog';
@@ -42,6 +42,7 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
   const [warningOpen, setWarningOpen] = useState(false);
   const [testState, setTestState] = useState<TestState>({ kind: 'idle' });
   const [backfillSummary, setBackfillSummary] = useState<string>('');
+  const [pullingRemote, setPullingRemote] = useState(false);
   const [shareQROpen, setShareQROpen] = useState(false);
   const [scanQROpen, setScanQROpen] = useState(false);
 
@@ -122,6 +123,24 @@ export function RemoteSyncSettingsSheet({ open, onOpenChange }: RemoteSyncSettin
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       setBackfillSummary(`Sync failed: ${message}`);
+    }
+  }
+
+  async function handlePullFromRemote() {
+    setPullingRemote(true);
+    setBackfillSummary('Pulling from remote…');
+    try {
+      const summary = await pullAll();
+      setBackfillSummary(
+        `Imported — ${summary.match} match, ${summary.pit} pit, ${summary.gamificationScouts} scouts, ` +
+        `${summary.gamificationPredictions} predictions, ${summary.gamificationAchievements} achievements, ` +
+        `${summary.teamRepos} repo links.`
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setBackfillSummary(`Pull failed: ${message}`);
+    } finally {
+      setPullingRemote(false);
     }
   }
 
@@ -340,6 +359,16 @@ curl -X PUT $URL/_node/_local/_config/cors/headers -d '"accept, authorization, c
                 >
                   {status.isPushing ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : <RefreshCwIcon className="mr-2 size-4" />}
                   Sync now
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!settings.remoteSync.enabled || pullingRemote}
+                  onClick={handlePullFromRemote}
+                  title="Import all records from the remote database into local storage"
+                >
+                  {pullingRemote ? <Loader2Icon className="mr-2 size-4 animate-spin" /> : <CloudDownloadIcon className="mr-2 size-4" />}
+                  Pull from remote
                 </Button>
               </div>
               {backfillSummary && <p className="text-xs text-muted-foreground">{backfillSummary}</p>}

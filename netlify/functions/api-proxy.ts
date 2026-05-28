@@ -10,6 +10,7 @@ const tbaAllowed = [
   /^\/event\/[a-z0-9]+\/matches(?:\/simple)?$/i,
   /^\/event\/[a-z0-9]+\/teams\/keys$/i,
   /^\/match\/[a-z0-9_]+$/i,
+  /^\/team\/frc\d+\/social_media$/i,
 ];
 
 const nexusAllowed = [

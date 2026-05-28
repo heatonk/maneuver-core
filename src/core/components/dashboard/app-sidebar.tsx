@@ -62,6 +62,10 @@ const data = {
         {
           title: "API Data",
           url: "/api-data",
+        },
+        {
+          title: "GitHub Autos",
+          url: "/github-autos",
         }
       ]
     },
@@ -73,10 +77,6 @@ const data = {
         {
           title: "Strategy Overview",
           url: "/strategy-overview",
-        },
-        {
-          title: "Match Validation",
-          url: "/match-validation",
         },
         {
           title: "Team Stats",
@@ -100,6 +100,10 @@ const data = {
         {
           title: "Scout Dashboard",
           url: "/scout-management",
+        },
+        {
+          title: "Match Validation",
+          url: "/match-validation",
         },
         {
           title: "Achievements",

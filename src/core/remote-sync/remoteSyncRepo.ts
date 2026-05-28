@@ -10,24 +10,39 @@ import type { ScoutingEntryBase } from '@/core/types/scouting-entry';
 import type { PitScoutingEntryBase } from '@/core/types/pit-scouting';
 import type { Scout, MatchPrediction } from '@/core/types/gamification';
 import type { ScoutAchievement } from '@/game-template/gamification/types';
+import type { TeamRepoLink } from '@/core/db/teamGitHubLinksDB';
 import type { RemoteDoc } from './remoteSyncClient';
 
-export type RecordType = 'match' | 'pit' | 'gam-scout' | 'gam-prediction' | 'gam-achievement';
+export type RecordType =
+  | 'match'
+  | 'pit'
+  | 'gam-scout'
+  | 'gam-prediction'
+  | 'gam-achievement'
+  | 'tgh-repo';
 
 export type MatchRecord = ScoutingEntryBase;
 export type PitRecord = PitScoutingEntryBase;
 export type ScoutRecord = Scout;
 export type PredictionRecord = MatchPrediction;
 export type AchievementRecord = ScoutAchievement;
+export type TeamRepoRecord = TeamRepoLink;
 
-export type AnyRecord = MatchRecord | PitRecord | ScoutRecord | PredictionRecord | AchievementRecord;
+export type AnyRecord =
+  | MatchRecord
+  | PitRecord
+  | ScoutRecord
+  | PredictionRecord
+  | AchievementRecord
+  | TeamRepoRecord;
 
 const PREFIX: Record<RecordType, string> = {
   match: 'match',
   pit: 'pit',
   'gam-scout': 'gam-scout',
   'gam-prediction': 'gam-prediction',
-  'gam-achievement': 'gam-achievement'
+  'gam-achievement': 'gam-achievement',
+  'tgh-repo': 'tgh-repo'
 };
 
 export function getPrefix(type: RecordType): string {
@@ -52,6 +67,8 @@ export function localKeyForRecord(record: AnyRecord, type: RecordType): string {
       const a = record as AchievementRecord;
       return `${a.scoutName}::${a.achievementId}`;
     }
+    case 'tgh-repo':
+      return String((record as TeamRepoRecord).teamNumber);
   }
 }
 

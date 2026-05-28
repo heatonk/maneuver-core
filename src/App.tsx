@@ -20,6 +20,7 @@ import TeleopScoringPage from "@/core/pages/TeleopScoringPage";
 import EndgamePage from "@/core/pages/EndgamePage";
 import { PitScoutingPage } from "@/core/pages/PitScoutingPage";
 import APIDataPage from "@/core/pages/APIDataPage";
+import GitHubAutosPage from "@/core/pages/GitHubAutosPage";
 import JSONDataTransferPage from "@/core/pages/JSONDataTransferPage";
 import PeerTransferPage from "@/core/pages/PeerTransferPage";
 import QRDataTransferPage from "@/core/pages/QRDataTransferPage";
@@ -104,6 +105,7 @@ function App() {
         <Route path="/clear-data" element={<ClearDataPage />} />
         <Route path="/pit-scouting" element={<PitScoutingPage />} />
         <Route path="/api-data" element={<APIDataPage />} />
+        <Route path="/github-autos" element={<GitHubAutosPage />} />
         <Route path="/json-transfer" element={<JSONDataTransferPage />} />
         <Route path="/peer-transfer" element={<PeerTransferPage />} />
         <Route path="/qr-transfer" element={<QRDataTransferPage />} />

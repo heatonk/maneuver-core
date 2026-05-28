@@ -11,9 +11,7 @@ import { Separator } from "@/core/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/core/components/ui/select";
 import { createMatchSchedulePayload } from "@/core/lib/matchScheduleTransfer";
 import { downloadTextFile } from "@/core/lib/downloadUtils";
-import { CloudDownload, Loader2 } from "lucide-react";
-import { useSettings } from "@/core/contexts/SettingsContext";
-import { pullAll } from "@/core/remote-sync/remoteSyncService";
+import { Loader2 } from "lucide-react";
 
 const getSortableMatchNumber = (matchNumber: unknown, matchKey: unknown): number => {
   if (typeof matchNumber === 'number' && Number.isFinite(matchNumber)) return matchNumber;
@@ -39,25 +37,6 @@ const JSONDataTransferPage = () => {
   const [mode, setMode] = useState<'select' | 'upload'>('select');
   const [dataType, setDataType] = useState<'scouting' | 'scoutProfiles' | 'pitScouting' | 'pitScoutingImagesOnly' | 'matchSchedule'>('scouting');
   const [activeDownload, setActiveDownload] = useState<'json' | 'csv' | null>(null);
-  const { settings } = useSettings();
-  const [pullingRemote, setPullingRemote] = useState(false);
-  const [pullSummary, setPullSummary] = useState<string>('');
-
-  const handlePullFromRemote = async () => {
-    setPullingRemote(true);
-    setPullSummary('');
-    try {
-      const summary = await pullAll();
-      setPullSummary(
-        `Imported — ${summary.match} match, ${summary.pit} pit, ${summary.gamificationScouts} scouts, ` +
-        `${summary.gamificationPredictions} predictions, ${summary.gamificationAchievements} achievements.`
-      );
-    } catch (err) {
-      setPullSummary(`Pull failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setPullingRemote(false);
-    }
-  };
 
   if (mode === 'upload') {
     return (
@@ -486,37 +465,6 @@ const JSONDataTransferPage = () => {
           >
             Upload JSON Data
           </Button>
-
-          {settings.remoteSync.enabled && (
-            <>
-              <div className="flex items-center gap-4">
-                <Separator className="flex-1" />
-                <span className="text-sm text-muted-foreground">REMOTE SYNC</span>
-                <Separator className="flex-1" />
-              </div>
-              <Button
-                onClick={handlePullFromRemote}
-                variant="outline"
-                disabled={pullingRemote}
-                className="w-full h-16 text-xl"
-              >
-                {pullingRemote ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                    <span>Pulling from remote…</span>
-                  </span>
-                ) : (
-                  <span className="flex items-center justify-center gap-2">
-                    <CloudDownload className="h-5 w-5" />
-                    <span>Pull from Remote DB</span>
-                  </span>
-                )}
-              </Button>
-              {pullSummary && (
-                <p className="text-xs text-muted-foreground text-center">{pullSummary}</p>
-              )}
-            </>
-          )}
         </div>
 
         <div className="text-xs text-muted-foreground text-start space-y-1">

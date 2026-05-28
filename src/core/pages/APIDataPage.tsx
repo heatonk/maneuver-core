@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { CloudDownload, Loader2 } from 'lucide-react';
+import { CloudDownload, EyeIcon, EyeOffIcon, Github, Loader2 } from 'lucide-react';
+import { Input } from '@/core/components/ui/input';
+import { Label } from '@/core/components/ui/label';
+import { getStoredGitHubPat, setStoredGitHubPat } from '@/core/lib/github/githubClient';
 
 // Import hooks and components
 import { useTBAData } from '@/core/hooks/useTBAData';
@@ -72,6 +75,11 @@ const APIDataPage: React.FC = () => {
   // "Load all data" combined action
   const [loadingAll, setLoadingAll] = useState(false);
 
+  // GitHub PAT for the GitHub Autos page
+  const [githubPat, setGithubPat] = useState<string>('');
+  const [showGithubPat, setShowGithubPat] = useState(false);
+  const [githubPatSaved, setGithubPatSaved] = useState(false);
+
   // Use the TBA data hook
   const {
     matchDataLoading,
@@ -104,7 +112,15 @@ const APIDataPage: React.FC = () => {
     if (sessionEventKey) {
       setEventKey(sessionEventKey);
     }
+    setGithubPat(getStoredGitHubPat());
   }, []);
+
+  const handleSaveGithubPat = () => {
+    setStoredGitHubPat(githubPat);
+    setGithubPatSaved(true);
+    toast.success(githubPat.trim() ? 'GitHub PAT saved.' : 'GitHub PAT cleared.');
+    setTimeout(() => setGithubPatSaved(false), 2000);
+  };
 
   // Check if stored data exists
   useEffect(() => {
@@ -586,6 +602,55 @@ const APIDataPage: React.FC = () => {
       {/* {dataType === 'validation-testing' && eventKey && (
         <ValidationTesting eventKey={eventKey} tbaApiKey={apiKey} />
       )} */}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Github className="h-5 w-5" />
+            GitHub
+          </CardTitle>
+          <CardDescription>
+            Used by the GitHub Autos page to discover team repos and pull PathPlanner /
+            Choreo files. Anonymous requests are capped at 60/hour; a personal access
+            token raises that to 5,000/hour. Token is stored on this device only.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1">
+            <Label htmlFor="github-pat">Personal access token (optional)</Label>
+            <div className="relative">
+              <Input
+                id="github-pat"
+                type={showGithubPat ? 'text' : 'password'}
+                placeholder="ghp_… (leave empty to use anonymous requests)"
+                value={githubPat}
+                onChange={(e) => setGithubPat(e.target.value)}
+                autoComplete="off"
+              />
+              <button
+                type="button"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                onClick={() => setShowGithubPat(v => !v)}
+                aria-label={showGithubPat ? 'Hide token' : 'Show token'}
+              >
+                {showGithubPat ? <EyeOffIcon className="size-4" /> : <EyeIcon className="size-4" />}
+              </button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A fine-grained token with read-only "Contents" access on public repos is
+              sufficient. No write scopes needed.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button onClick={handleSaveGithubPat} variant="secondary">
+              Save token
+            </Button>
+            {githubPatSaved && (
+              <span className="text-xs text-emerald-600">Saved.</span>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Event Switch Confirmation Dialog */}
       <EventSwitchConfirmDialog

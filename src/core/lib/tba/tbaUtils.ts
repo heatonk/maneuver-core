@@ -47,6 +47,14 @@ export interface TBATeam {
   country?: string;
 }
 
+export interface TBASocialMedia {
+  type: string;
+  foreign_key: string;
+  name?: string;
+  details?: string;
+  preferred?: boolean;
+}
+
 // ============================================================================
 // Helper Functions
 // ============================================================================
@@ -104,6 +112,28 @@ export const getEventTeams = async (eventKey: string, apiKey: string): Promise<T
       name: `Team ${teamNumber}`,
     };
   }).sort((a, b) => a.team_number - b.team_number);
+};
+
+/**
+ * Get a team's registered social media accounts (TBA). The `github-profile`
+ * type carries the team's GitHub username/org in `foreign_key`, when present.
+ */
+export const getTeamSocialMedia = async (teamNumber: number, apiKey?: string): Promise<TBASocialMedia[]> => {
+  const teamKey = `frc${teamNumber}`;
+  return proxyGetJson<TBASocialMedia[]>(
+    'tba',
+    `/team/${teamKey}/social_media`,
+    { apiKeyOverride: apiKey || undefined }
+  );
+};
+
+/**
+ * Extract the GitHub profile/org name from a team's TBA social media list, if
+ * registered. Returns null if the team has no github-profile entry.
+ */
+export const getTeamGitHubProfile = (socialMedia: TBASocialMedia[]): string | null => {
+  const entry = socialMedia.find(s => s.type === 'github-profile');
+  return entry?.foreign_key?.trim() || null;
 };
 
 // ============================================================================
